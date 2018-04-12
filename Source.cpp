@@ -54,7 +54,7 @@ typedef struct {
 typedef struct {
 	point_t center;
 	float angle;
-	int speed;
+	int speed, direction;
 }enemy_t;
 
 enemy_t e[3];
@@ -151,7 +151,8 @@ void basis() {
 	glVertex2f(-500, 0);
 	glEnd();
 }
-
+//X = x*cos(a) - y*sin(a)
+//Y = x*sin(a) + y*cos(a)
 void player() {
 	//Body of kunai
 	glBegin(GL_QUADS);
@@ -191,12 +192,51 @@ void player() {
 }
 
 void enemy(enemy_t e) {
-	glColor3f(0.3, 0.5, 0.8);
+	glColor3f(0, 0, 0);
 	circle(e.center.x * cos(e.angle*D2R), e.center.y * sin(e.angle*D2R), 20);
+	glColor3ub(255, 227, 159);
+	circle(e.center.x * cos(e.angle*D2R), e.center.y * sin(e.angle*D2R), 16);
+	glColor3f(1, 0, 0);
+	circle(e.center.x * cos(e.angle*D2R), e.center.y * sin(e.angle*D2R), 13);
+	glColor3f(0, 0, 0);
+	circle(e.center.x * cos(e.angle*D2R), e.center.y * sin(e.angle*D2R), 5);	
+	if (cos(e.angle*D2R) == 0 || cos(e.angle*D2R) == 1)
+		printf("%.2f\t%.2f\n\n", (e.center.x + 17) * cos(e.angle*D2R) - (e.center.y + 17) * sin(e.angle*D2R), (e.center.y + 17) * sin(e.angle*D2R) + (e.center.x + 17) * cos(e.angle*D2R));
 }
-
+/* I wanted to test it here, but I can't move it, it does some shit so I just removed everthing and copy pasted player function here*/
 void fire() {
-	circle(b.center.x*cos(b.angle*D2R), b.center.y*sin(b.angle*D2R), 8);
+	//Body of kunai
+	glBegin(GL_QUADS);
+	glColor3ub(234, 32, 39);
+	glVertex2f(4 * cos(p.angle*D2R) - 4 * sin(p.angle*D2R), 4 * sin(p.angle*D2R) + 4 * cos(p.angle*D2R));
+	glVertex2f(4 * cos(p.angle*D2R) + 4 * sin(p.angle*D2R), 4 * sin(p.angle*D2R) - 4 * cos(p.angle*D2R));
+	glVertex2f(25 * cos(p.angle*D2R) + 4 * sin(p.angle*D2R), 25 * sin(p.angle*D2R) - 4 * cos(p.angle*D2R));
+	glVertex2f(25 * cos(p.angle*D2R) - 4 * sin(p.angle*D2R), 25 * sin(p.angle*D2R) + 4 * cos(p.angle*D2R));
+	glEnd();
+
+	//Lines around body
+	glColor3ub(30, 30, 30);
+	glLineWidth(2);
+	glBegin(GL_LINES);
+	for (int i = 8; i < 25; i += 4) {
+		glVertex2f(i * cos(p.angle*D2R) - 4 * sin(p.angle*D2R), i * sin(p.angle*D2R) + 4 * cos(p.angle*D2R));
+		glVertex2f(i * cos(p.angle*D2R) + 4 * sin(p.angle*D2R), i * sin(p.angle*D2R) - 4 * cos(p.angle*D2R));
+	}
+	glEnd();
+	glLineWidth(1);
+
+	//"Hand" of kunai
+	circle(0.0001*cos(p.angle*D2R), 0.0001 *sin(p.angle*D2R), 8);
+
+	//"Head" of kunai
+	glColor3ub(30, 30, 30);
+	glBegin(GL_POLYGON);
+	glVertex2f(25 * cos(p.angle*D2R) - 4 * sin(p.angle*D2R), 25 * sin(p.angle*D2R) + 4 * cos(p.angle*D2R));
+	glVertex2f(35 * cos(p.angle*D2R) - 10 * sin(p.angle*D2R), 35 * sin(p.angle*D2R) + 10 * cos(p.angle*D2R));
+	glVertex2f(60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R), 60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R));
+	glVertex2f(35 * cos(p.angle*D2R) + 10 * sin(p.angle*D2R), 35 * sin(p.angle*D2R) - 10 * cos(p.angle*D2R));
+	glVertex2f(25 * cos(p.angle*D2R) + 4 * sin(p.angle*D2R), 25 * sin(p.angle*D2R) - 4 * cos(p.angle*D2R));
+	glEnd();
 }
 void drawGradient(int x1, int y1, int w, int h, float r, float g, float b) {
 	glBegin(GL_QUADS);
@@ -361,14 +401,14 @@ void onTimer(int v) {
 	
 	// Drawing enemies
 	for (int i = 0; i < 3; i++) {
-		e[i].angle += e[i].speed;
+		e[i].angle += e[i].speed * e[i].direction;
 		if (e[i].angle > 360)
 			e[i].angle -= 360;
 	}
 
 	// Fire mechanics
 	if (b.active) {
-		b.center.x = b.center.y += b.speed;
+		b.speed += 3;
 		if (fabs(b.center.x) > 400) {
 			b.active = false;
 			b.center = { 0,0 };
@@ -391,8 +431,9 @@ void Init() {
 	for (int i = 0; i < 3; i++) {
 		e[i].center.x = 350 - i * 100;
 		e[i].center.y = e[i].center.x;
-		e[i].angle = 0;
+		e[i].angle = rand() % 360;
 		e[i].speed = rand() % 5 + 1;
+		e[i].direction = rand() % 2 * 2 - 1;
 	}
 
 }
