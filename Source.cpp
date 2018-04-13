@@ -51,6 +51,7 @@ typedef struct {
 	point_t center;
 	float angle;
 	int speed, direction;
+	bool visible = true;
 }enemy_t;
 
 enemy_t e[3];
@@ -206,14 +207,11 @@ void enemy(enemy_t e) {
 	vprint2(e.center.x * cos(e.angle*D2R) - 9, e.center.y * sin(e.angle*D2R) - 4, 0.08, "%d", (abs)((int)e.angle % 360));
 }
 //This foo doesn't work
-int collision() {
-	float p1 = 0.0001*cos(p.angle*D2R) + p.speed*cos(p.angle*D2R), p2 = 0.0001 *sin(p.angle*D2R) + p.speed*sin(p.angle*D2R),
-		p3 = 60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R), p4 = 60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R);
-	for (int i = 0; i < 3; i++) {
-		if (fabs(e[i].center.y) < fabs(p2) && fabs(e[i].center.y) > fabs(p4))
-			return i;
-	}
-	return -1;
+bool collision(enemy_t e) { 
+	float dx = 60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R)-e.center.x;
+	float dy = 60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R)-e.center.y;
+	float d = sqrt(dx*dx + dy*dy);
+	return d <= 40;
 }
 
 void drawGradient(int x1, int y1, int w, int h, float r, float g, float b) {
@@ -245,9 +243,10 @@ void display() {
 	glClear(GL_COLOR_BUFFER_BIT);
 	drawGradient(-500, 375, 1000,750, 95, 39, 205);
 	basis();
-	player();
 	for(int i = 0 ; i<3; i++)
-		enemy(e[i]);
+		if(e[i].visible)
+			enemy(e[i]);
+	player();
 
 	glutSwapBuffers();
 }
@@ -260,7 +259,8 @@ void onKeyDown(unsigned char key, int x, int y)
 	// exit when ESC is pressed.
 	if (key == 27)
 		exit(0);
-	
+	if (key == 32)
+		printf("%.0f  %.0f\n", 60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R), 60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R));
 	// to refresh the window it calls display() function
 	glutPostRedisplay();
 }
@@ -397,8 +397,9 @@ void onTimer(int v) {
 		}
 	}
 
-	if (collision() != -1)
-		printf("%d\n", collision());
+	for (int i = 0; i < 3; i++)
+		if (collision(e[i]) == 1)
+			e[i].visible = false;
 	// to refresh the window it calls display() function
 	glutPostRedisplay(); // display()
 
@@ -415,7 +416,7 @@ void Init() {
 		e[i].center.x = 360 - i * 70;
 		e[i].center.y = e[i].center.x;
 		e[i].angle = rand() % 360;
-		e[i].speed = rand() % 5 + 1;
+		e[i].speed = rand() % 3 + 1;
 		e[i].direction = rand() % 2 * 2 - 1;
 	}
 
