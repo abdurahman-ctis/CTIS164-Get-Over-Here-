@@ -8,6 +8,7 @@ HOMEWORK: #3
 PROBLEMS:
 ----------
 ADDITIONAL FEATURES:
+	-> Name of the game is derived from famous kunai attack of Scorpion from Mortal Kombat, from which I got inspiration.
 *********/
 
 #include <GL/glut.h>
@@ -17,12 +18,15 @@ ADDITIONAL FEATURES:
 #include <string.h>
 #include <stdarg.h>
 #include <time.h>
+#include <vector>
+using namespace std;
 
 #define WINDOW_WIDTH  1000
 #define WINDOW_HEIGHT 750
 
-#define TIMER_PERIOD    16 // Period for the timer.
-#define TIMER_ON         1 // 0:disable timer, 1:enable timer
+#define TIMER_PERIOD      16  // Period for the timer of movements and rotations.
+#define REAL_TIMER_PERIOD 10 // Period for the actual timer showing time.
+#define TIMER_ON          1 // 0:disable timer, 1:enable timer
 
 #define D2R 0.0174532
 
@@ -36,15 +40,16 @@ int  winWidth, winHeight; // current Window width and height
 						  //
 
 /* Stuff for this project */
+#define START 0
+#define GAME  1
 typedef struct {
 	float x, y;
 }point_t;
 
 typedef struct {
 	float angle = 0;
-	point_t center = { 0,0 };
 	bool active = false;
-	int speed = 20, dir = 1;
+	int speed = 0, dir = 1;
 }player_t;
 
 typedef struct {
@@ -54,8 +59,20 @@ typedef struct {
 	bool visible = true;
 }enemy_t;
 
+typedef struct {
+	char name[50], time[50];
+}score_t;
+
 enemy_t e[3];
 player_t p;
+int state = START,
+    hit = 0,
+	scoreSize = 0;
+int min1 = 0, min2 = 0, sec1 = 0, sec2 = 0, mSec1 = 0, mSec2 = 0;
+bool enterName = false;
+char name[50] = "";
+//vector < pair<char*, char*>> scores;
+score_t scores[10];
 
 void circle(int x, int y, int r)
 {
@@ -74,7 +91,7 @@ void circle_wire(int x, int y, int r)
 {
 #define PI 3.1415
 	float angle;
-
+	glLineWidth(3);
 	glBegin(GL_LINE_LOOP);
 	for (int i = 0; i < 100; i++)
 	{
@@ -82,6 +99,7 @@ void circle_wire(int x, int y, int r)
 		glVertex2f(x + r*cos(angle), y + r*sin(angle));
 	}
 	glEnd();
+	glLineWidth(1);
 }
 
 void print(int x, int y, char *string, void *font)
@@ -135,7 +153,39 @@ void vprint2(int x, int y, float size, char *string, ...) {
 	glPopMatrix();
 }
 
+void drawGradient(int x1, int y1, int w, int h, float r, float g, float b) {
+	glBegin(GL_QUADS);
+	glColor3ub(r, g, b);
+	glVertex2f(x1, y1);
+	glVertex2f(x1 + w, y1);
+	glColor3ub(r + 102, g + 102, b + 102);
+	glVertex2f(x1 + w, y1 - h);
+	glVertex2f(x1, y1 - h);
+	glEnd();
+	glColor3f(0.1, 0.1, 0.1);
+	glBegin(GL_LINE_LOOP);
+	glVertex2f(x1, y1);
+	glVertex2f(x1 + w, y1);
+	glVertex2f(x1 + w, y1 - h);
+	glVertex2f(x1, y1 - h);
+	glEnd();
+}
+
+void gRec() {
+	glBegin(GL_QUADS);
+	//red color
+	glColor3f(0, 0.0, 0.0);
+	glVertex2f(-300,300);
+	glVertex2f(-300, -300);
+	//blue color
+	glColor3f(0.1, 0.1, 0.1);
+	glVertex2f(300, -300);
+	glVertex2f(300, 300);
+	glEnd();
+}
+
 void basis() {
+	drawGradient(-500, 375, 1000, 750, 95, 39, 205);
 	glColor3f(1, 1, 1);
 	circle_wire(0, 0, 360);
 	circle_wire(0, 0, 290);
@@ -147,6 +197,7 @@ void basis() {
 	glVertex2f(-500, 0);
 	glEnd();
 }
+
 //x = x*cos(a) - y*sin(a)
 //y = x*sin(a) + y*cos(a)
 void player() {
@@ -171,7 +222,7 @@ void player() {
 	glLineWidth(1);
 
 	//"Hand" of kunai
-	circle(0.0001*cos(p.angle*D2R) + p.speed*cos(p.angle*D2R), 0.0001 *sin(p.angle*D2R) + p.speed*sin(p.angle*D2R), 8);
+	circle(0.000001*cos(p.angle*D2R) + p.speed*cos(p.angle*D2R), 0.000001 *sin(p.angle*D2R) + p.speed*sin(p.angle*D2R), 8);
 
 	//"Head" of kunai
 	glColor3ub(30, 30, 30);
@@ -182,6 +233,21 @@ void player() {
 	glVertex2f(35 * cos(p.angle*D2R) + 10 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R), 35 * sin(p.angle*D2R) - 10 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R));
 	glVertex2f(25 * cos(p.angle*D2R) + 4 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R), 25 * sin(p.angle*D2R) - 4 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R));
 	glEnd();
+
+	//Chains
+	if (p.active) {
+		glColor3f(0, 0, 0);
+		glLineWidth(3);
+		int j = 0.0001*cos(p.angle*D2R) + p.speed*cos(p.angle*D2R);
+		glBegin(GL_LINES);
+		glVertex2f(0.0001*cos(p.angle*D2R) + p.speed*cos(p.angle*D2R), 0.0001 *sin(p.angle*D2R) + p.speed*sin(p.angle*D2R));
+		glVertex2f(0, 0);
+		glEnd();
+		glLineWidth(1);
+	}
+	circle_wire(0, 0, 8);
+	circle(0, 0, 3);
+
 	if (!p.active) {
 		//Angle
 		glColor3f(1, 1, 1);
@@ -198,38 +264,49 @@ void enemy(enemy_t e) {
 	circle(e.center.x * cos(e.angle*D2R), e.center.y * sin(e.angle*D2R), 20);
 	glColor3f(0, 0, 0);
 	circle(e.center.x * cos(e.angle*D2R), e.center.y * sin(e.angle*D2R), 5);	
-	if (cos(e.angle*D2R) == 0 || cos(e.angle*D2R) == 1)
-		printf("%.2f\t%.2f\n\n", (e.center.x + 17) * cos(e.angle*D2R) - (e.center.y + 17) * sin(e.angle*D2R), (e.center.y + 17) * sin(e.angle*D2R) + (e.center.x + 17) * cos(e.angle*D2R));
 	//Angle
 	glColor3f(0.9, 0.9, 0.9);
 	circle(e.center.x * cos(e.angle*D2R), e.center.y * sin(e.angle*D2R), 15);
 	glColor3f(0, 0, 0);
 	vprint2(e.center.x * cos(e.angle*D2R) - 9, e.center.y * sin(e.angle*D2R) - 4, 0.08, "%d", (abs)((int)e.angle % 360));
 }
-//This foo doesn't work
+
 bool collision(enemy_t e) { 
-	float dx = 60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R)-e.center.x;
-	float dy = 60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R)-e.center.y;
-	float d = sqrt(dx*dx + dy*dy);
-	return d <= 40;
+	float x = 60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R);
+	float y = 60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R);
+	float dx = fabs(x - e.center.x* cos(e.angle*D2R));
+	float dy = fabs(y - e.center.y* sin(e.angle*D2R));
+	float d = sqrtf(dx*dx + dy*dy);
+	return dx + dy <= 30;
 }
 
-void drawGradient(int x1, int y1, int w, int h, float r, float g, float b) {
-	glBegin(GL_QUADS);
-	glColor3ub(r, g, b);
-	glVertex2f(x1, y1);
-	glVertex2f(x1 + w, y1);
-	glColor3ub(r + 102, g + 102, b + 102);
-	glVertex2f(x1 + w, y1 - h);
-	glVertex2f(x1, y1 - h);
-	glEnd();
-	glColor3f(0.1, 0.1, 0.1);
-	glBegin(GL_LINE_LOOP);
-	glVertex2f(x1, y1);
-	glVertex2f(x1 + w, y1);
-	glVertex2f(x1 + w, y1 - h);
-	glVertex2f(x1, y1 - h);
-	glEnd();
+void drawStart() {
+	glColor3f(1, 1, 0);
+	vprint2(-300, 100, 0.5, "Get Over Here !!!");
+	vprint2(-150, -50, 0.25, "Click to start.");
+	for (int i = 0; i < scoreSize; i++)
+		vprint2(-150, -100 - i*40, 0.25, "%-10s%s", scores[i].name, scores[i].time);
+}
+
+void drawGame() {
+	basis();
+	glColor3f(0, 0, 0);
+	glRectf(-500, 400, -400, 330);
+	glColor3f(0, 1, 0);
+	vprint(-485, 350, GLUT_BITMAP_9_BY_15, "%d%d:%d%d:%d%d", min1, min2, sec1, sec2, mSec1, mSec2);
+	for (int i = 0; i < 3; i++)
+		if (e[i].visible)
+			enemy(e[i]);
+	player();
+	if (enterName)
+	{
+		gRec();
+		glColor3f(1, 1, 1);
+		vprint2(-250, 100, 0.4, "Enter your name : ", name);
+		vprint2(-250, 0, 0.4, "<Space> to finish", name);
+		glColor3f(1, 1, 1);
+		vprint2(-240, -120, 0.5, "%s", name);
+	}
 }
 
 //
@@ -241,13 +318,14 @@ void display() {
 	//
 	glClearColor(0, 0, 0, 0);
 	glClear(GL_COLOR_BUFFER_BIT);
-	drawGradient(-500, 375, 1000,750, 95, 39, 205);
-	basis();
-	for(int i = 0 ; i<3; i++)
-		if(e[i].visible)
-			enemy(e[i]);
-	player();
-
+	switch (state) {
+	case START:
+		drawStart();
+		break;
+	case GAME:
+		drawGame();
+		break;
+	}
 	glutSwapBuffers();
 }
 
@@ -256,11 +334,33 @@ void display() {
 //
 void onKeyDown(unsigned char key, int x, int y)
 {
-	// exit when ESC is pressed.
+	char c[2] = "";
+	c[0] = key;
 	if (key == 27)
 		exit(0);
-	if (key == 32)
-		printf("%.0f  %.0f\n", 60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R), 60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R));
+	if (enterName && *c >= 'a' && *c <= 'z')
+		strcat(name, c);
+	if (key == 32 && enterName)
+	{
+		char time[50];
+		score_t temp;
+		sprintf(time, "%d%d:%d%d:%d%d", min1, min2, sec1, sec2, mSec1, mSec2);
+		strcpy(temp.time, time);
+		strcpy(temp.name, name);
+		enterName = false;
+		scores[scoreSize++] = temp;
+		//sort(scores.begin(), scores.end());
+		state = START;
+		sec2 = sec1 = mSec1 = mSec2 = min1 = min2 = hit = 0;
+		for (int i = 0; i < 3; i++) {
+			e[i].center.x = 360 - i * 70;
+			e[i].center.y = e[i].center.x;
+			e[i].angle = rand() % 360;
+			e[i].speed = rand() % 3 + 1;
+			e[i].direction = rand() % 2 * 2 - 1;
+			e[i].visible = true;
+		}
+	}
 	// to refresh the window it calls display() function
 	glutPostRedisplay();
 }
@@ -321,9 +421,15 @@ void onSpecialKeyUp(int key, int x, int y)
 void onClick(int button, int stat, int x, int y)
 {
 	// Write your codes here.
+	if (button == GLUT_LEFT_BUTTON && stat == GLUT_DOWN && state == START)
+	{
+		name[0] = '\0';
+		state = GAME;
+	}
 
-	if (button == GLUT_LEFT_BUTTON && stat == GLUT_DOWN)
+	else if (button == GLUT_LEFT_BUTTON && stat == GLUT_DOWN && state == GAME && hit != 3)
 		p.active = true;
+
 
 	// to refresh the window it calls display() function
 	glutPostRedisplay();
@@ -361,7 +467,12 @@ void onMoveDown(int x, int y) {
 //   y2 = winHeight / 2 - y1
 void onMove(int x, int y) {
 	// Write your codes here.
-	if (!p.active) {
+	if (hit == 3)
+	{
+		p.angle = 0;
+		p.active = false;
+	}
+	else if (!p.active) {
 		x -= winWidth / 2;
 		y = winHeight / 2 - y;
 		p.angle = atan2f(y, x) / D2R;
@@ -373,12 +484,37 @@ void onMove(int x, int y) {
 }
 
 #if TIMER_ON == 1
+void timerFoo(int v) {
+	glutTimerFunc(REAL_TIMER_PERIOD, timerFoo, 0);
+	if (state == GAME && hit != 3) {
+		if (mSec2 == 9) {
+			mSec1++;
+			mSec2 = 0;
+
+			if (mSec1 == 10) {
+				sec2++;
+				mSec1 = 0;
+			}
+		}
+		if (sec2 == 10) {
+			sec1++;
+			sec2 = 0;
+
+			if (sec1 == 6) {
+				min2++;
+				sec1 = 0;
+			}
+		}
+		mSec2++;
+	}
+}
 void onTimer(int v) {
 
 	glutTimerFunc(TIMER_PERIOD, onTimer, 0);
 	
 	// Drawing enemies
 	for (int i = 0; i < 3; i++) {
+		e[i].speed = 0;
 		e[i].angle += e[i].speed * e[i].direction;
 		if (e[i].angle > 360)
 			e[i].angle -= 360;
@@ -386,12 +522,12 @@ void onTimer(int v) {
 
 	// Fire mechanics
 	if (p.active) {
-		p.speed += 10 * p.dir;
+		p.speed += 15 * p.dir;
 		if (fabs(60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R)) > 500 ||
 			fabs(60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R)) > 500) {
 			p.dir = -1;
 		}
-		if (p.dir == -1 && p.speed == 20) {
+		if (p.dir == -1 && p.speed == 0) {
 			p.active = false;
 			p.dir = 1;
 		}
@@ -399,7 +535,13 @@ void onTimer(int v) {
 
 	for (int i = 0; i < 3; i++)
 		if (collision(e[i]) == 1)
+		{
+			if(e[i].visible)
+				hit++;
 			e[i].visible = false;
+		}
+	if (hit == 3 && p.speed == 0)
+		enterName = true;
 	// to refresh the window it calls display() function
 	glutPostRedisplay(); // display()
 
@@ -427,7 +569,7 @@ void main(int argc, char *argv[]) {
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 	//glutInitWindowPosition(100, 100);
-	glutCreateWindow("Kunai Shoot by Abdurahman Atakishiyev");
+	glutCreateWindow("\"Get Over Here !!!\" by Abdurahman Atakishiyev");
 
 	glutDisplayFunc(display);
 	glutReshapeFunc(onResize);
@@ -451,6 +593,7 @@ void main(int argc, char *argv[]) {
 #if  TIMER_ON == 1
 	// timer event
 	glutTimerFunc(TIMER_PERIOD, onTimer, 0);
+	glutTimerFunc(REAL_TIMER_PERIOD, timerFoo, 0);
 #endif
 
 	Init();
