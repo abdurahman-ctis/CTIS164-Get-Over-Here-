@@ -9,6 +9,8 @@ PROBLEMS:
 ----------
 ADDITIONAL FEATURES:
 	-> Name of the game is derived from famous kunai attack of Scorpion from Mortal Kombat, from which I got inspiration.
+	-> After the game, enter your name to add to score list.
+	-> Scores are sorted.
 *********/
 
 #include <GL/glut.h>
@@ -61,6 +63,7 @@ typedef struct {
 
 typedef struct {
 	char name[50], time[50];
+	double score;
 }score_t;
 
 enemy_t e[3];
@@ -71,7 +74,6 @@ int state = START,
 int min1 = 0, min2 = 0, sec1 = 0, sec2 = 0, mSec1 = 0, mSec2 = 0;
 bool enterName = false;
 char name[50] = "";
-//vector < pair<char*, char*>> scores;
 score_t scores[10];
 
 void circle(int x, int y, int r)
@@ -284,8 +286,12 @@ void drawStart() {
 	glColor3f(1, 1, 0);
 	vprint2(-300, 100, 0.5, "Get Over Here !!!");
 	vprint2(-150, -50, 0.25, "Click to start.");
+	glColor3f(0, 1, 0);
 	for (int i = 0; i < scoreSize; i++)
-		vprint2(-150, -100 - i*40, 0.25, "%-10s%s", scores[i].name, scores[i].time);
+	{
+		vprint2(-140, -100 - i * 40, 0.25, "%d. %s", i+1, scores[i].name);
+		vprint2(0, -100 - i * 40, 0.25, "%3s", scores[i].time);
+	}
 }
 
 void drawGame() {
@@ -329,6 +335,34 @@ void display() {
 	glutSwapBuffers();
 }
 
+void swap(score_t *x, score_t *y)
+{
+	score_t temp;
+	temp = *x;
+	*x = *y;
+	*y = temp;
+}
+
+
+void bubble_sort(int n)
+{
+	int k,
+		pass, // number of current pass
+		sorted; /* flag to indicate whether sorting is
+				finished or not */
+	pass = 1;
+	do
+	{
+		sorted = 1; // assumes array is sorted
+		for (k = 0; k < n - pass; k++)
+			if (scores[k].score > scores[k + 1].score)
+			{
+				swap(&scores[k], &scores[k + 1]);
+				sorted = 0;
+			}
+		pass++;
+	} while (!sorted);
+}
 //
 // key function for ASCII charachters like ESC, a,b,c..,A,B,..Z
 //
@@ -347,9 +381,10 @@ void onKeyDown(unsigned char key, int x, int y)
 		sprintf(time, "%d%d:%d%d:%d%d", min1, min2, sec1, sec2, mSec1, mSec2);
 		strcpy(temp.time, time);
 		strcpy(temp.name, name);
+		temp.score = mSec2*0.01 + mSec1*0.1 + sec2 + 10 * sec1 + 60 * min1 + 600 * min2;
 		enterName = false;
 		scores[scoreSize++] = temp;
-		//sort(scores.begin(), scores.end());
+		bubble_sort(scoreSize);
 		state = START;
 		sec2 = sec1 = mSec1 = mSec2 = min1 = min2 = hit = 0;
 		for (int i = 0; i < 3; i++) {
@@ -467,9 +502,9 @@ void onMoveDown(int x, int y) {
 //   y2 = winHeight / 2 - y1
 void onMove(int x, int y) {
 	// Write your codes here.
-	if (hit == 3)
+	if (hit == 3 && p.speed == 0)
 	{
-		p.angle = 0;
+		//p.angle = 0;
 		p.active = false;
 	}
 	else if (!p.active) {
@@ -511,37 +546,37 @@ void timerFoo(int v) {
 void onTimer(int v) {
 
 	glutTimerFunc(TIMER_PERIOD, onTimer, 0);
-	
-	// Drawing enemies
-	for (int i = 0; i < 3; i++) {
-		e[i].speed = 0;
-		e[i].angle += e[i].speed * e[i].direction;
-		if (e[i].angle > 360)
-			e[i].angle -= 360;
-	}
+	if (hit != 3 || p.speed != 0) {
+		// Drawing enemies
+		for (int i = 0; i < 3; i++) {
+			e[i].angle += 0;//e[i].speed * e[i].direction;
+			if (e[i].angle > 360)
+				e[i].angle -= 360;
+		}
 
-	// Fire mechanics
-	if (p.active) {
-		p.speed += 15 * p.dir;
-		if (fabs(60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R)) > 500 ||
-			fabs(60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R)) > 500) {
-			p.dir = -1;
+		// Fire mechanics
+		if (p.active) {
+			p.speed += 15 * p.dir;
+			if (fabs(60 * cos(p.angle*D2R) - 0.0001 * sin(p.angle*D2R) + p.speed*cos(p.angle*D2R)) > 500 ||
+				fabs(60 * sin(p.angle*D2R) + 0.0001 * cos(p.angle*D2R) + p.speed*sin(p.angle*D2R)) > 500) {
+				p.dir = -1;
+			}
+			if (p.dir == -1 && p.speed == 0) {
+				p.active = false;
+				p.dir = 1;
+			}
 		}
-		if (p.dir == -1 && p.speed == 0) {
-			p.active = false;
-			p.dir = 1;
-		}
-	}
 
-	for (int i = 0; i < 3; i++)
-		if (collision(e[i]) == 1)
-		{
-			if(e[i].visible)
-				hit++;
-			e[i].visible = false;
-		}
-	if (hit == 3 && p.speed == 0)
-		enterName = true;
+		for (int i = 0; i < 3; i++)
+			if (collision(e[i]) == 1)
+			{
+				if (e[i].visible)
+					hit++;
+				e[i].visible = false;
+			}
+		if (hit == 3 && p.speed == 0)
+			enterName = true;
+	}
 	// to refresh the window it calls display() function
 	glutPostRedisplay(); // display()
 
